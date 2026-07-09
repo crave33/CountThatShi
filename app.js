@@ -133,12 +133,13 @@ function normalizeGroup(group) {
 }
 
 function normalizeCounter(counter) {
-  const name = counter.name || "Untitled counter";
-  const category = counter.category || counter.mergedCategory || name;
+  const category = normalizeMergedCategory(
+    counter.category || counter.mergedCategory || counter.name
+  );
   return {
     id: counter.id || crypto.randomUUID(),
-    name,
-    category: normalizeMergedCategory(category),
+    name: category,
+    category,
     value: numberFromInput(counter.value),
     moderated: Math.max(0, numberFromInput(counter.moderated)),
     includeInComparison: counter.includeInComparison !== false,
@@ -175,11 +176,13 @@ function createBlockGroupData(name, id = crypto.randomUUID()) {
 }
 
 function createCounterData(name) {
+  const category = normalizeMergedCategory(name);
   return {
     id: crypto.randomUUID(),
-    name,
-    category: normalizeMergedCategory(name),
+    name: category,
+    category,
     value: 0,
+    usage: "",
     moderated: 0,
     includeInComparison: true,
     multiplier: 1,
@@ -321,6 +324,12 @@ function removeBlockGroup(groupId) {
   );
   saveBlockGroups();
   saveBlocks();
+  render();
+}
+
+function moveBlockGroup(groupId, targetGroupId, placeAfter) {
+  blockGroups = moveItem(blockGroups, groupId, targetGroupId, placeAfter);
+  saveBlockGroups();
   render();
 }
 
@@ -518,7 +527,7 @@ function moveItem(items, itemId, targetId, placeAfter) {
 function clearDragTargets() {
   els.counterList
     .querySelectorAll(
-      ".counter-row.is-drag-over, .sub-block.is-drag-over, .is-drop-after"
+      ".block-group-row.is-drag-over, .counter-row.is-drag-over, .sub-block.is-drag-over, .is-drop-after"
     )
     .forEach((row) => {
       row.classList.remove("is-drag-over", "is-drop-after");
@@ -528,6 +537,23 @@ function clearDragTargets() {
 function getDragTargetFromPoint(clientX, clientY) {
   const element = document.elementFromPoint(clientX, clientY);
   if (!element || !draggedItem) return null;
+
+  if (draggedItem.type === "blockGroup") {
+    const blockGroupRow = element.closest(".block-group-row");
+    if (
+      !blockGroupRow ||
+      blockGroupRow.dataset.blockGroupId === draggedItem.blockGroupId
+    ) {
+      return null;
+    }
+    const bounds = blockGroupRow.getBoundingClientRect();
+    return {
+      kind: "blockGroup",
+      row: blockGroupRow,
+      targetId: blockGroupRow.dataset.blockGroupId,
+      placeAfter: clientY > bounds.top + bounds.height / 2,
+    };
+  }
 
   const blockRow = element.closest(".block-row");
   if (!blockRow || blockRow.dataset.blockId !== draggedItem.blockId) return null;
@@ -615,6 +641,10 @@ function formatNumber(value, maximumFractionDigits = 0) {
 
 function formatPercent(value) {
   return `${formatNumber(value * 100, 2)}%`;
+}
+
+function tooltip(value) {
+  return escapeAttribute(value);
 }
 
 function getAccountType(block) {
@@ -727,28 +757,31 @@ function renderPreview() {
   const projectedFullCap = safeDivide(metrics.accountOutputs, metrics.accountUsageTotal);
 
   els.previewSummary.innerHTML = `
-    <div><strong>${escapeAttribute(metrics.accountType)}</strong><span>Account type</span></div>
-    <div><strong>${formatNumber(metrics.accountOutputs)}</strong><span>Included outputs</span></div>
-    <div><strong>${formatNumber(projectedFullCap)}</strong><span>Projected full cap</span></div>
-    <div><strong>${formatPercent(metrics.accountUsageTotal)}</strong><span>Tracked usage</span></div>
+    <div title="${tooltip(`Preview is filtered to account type: ${metrics.accountType}`)}"><strong>${escapeAttribute(metrics.accountType)}</strong><span>Account type</span></div>
+    <div title="${tooltip(`Sum of outputs from included counters for ${metrics.accountType}.`)}"><strong>${formatNumber(metrics.accountOutputs)}</strong><span>Included outputs</span></div>
+    <div title="${tooltip(`${formatNumber(metrics.accountOutputs)} outputs / ${formatPercent(metrics.accountUsageTotal)} tracked usage = ${formatNumber(projectedFullCap)} projected full cap.`)}"><strong>${formatNumber(projectedFullCap)}</strong><span>Projected full cap</span></div>
+    <div title="${tooltip(`Total tracked usage from block usage start/end: ${formatPercent(metrics.accountUsageTotal)}.`)}"><strong>${formatPercent(metrics.accountUsageTotal)}</strong><span>Tracked usage</span></div>
   `;
 
   els.previewTableBody.innerHTML = metrics.categoryRows.length
     ? metrics.categoryRows
         .map(
-          (row) => `
+          (row) => {
+            const categoryUsagePoints = row.combinedUsage * 100;
+            return `
             <tr>
-              <td>${escapeAttribute(row.category)}</td>
-              <td>${formatNumber(row.combinedOutputs)}</td>
-              <td>${formatNumber(row.combinedModerated)}</td>
-              <td>${formatPercent(row.combinedUsage)}</td>
-              <td>${formatPercent(row.shareOfTrackedUsage)}</td>
-              <td>${formatNumber(row.outputsPer1PctUsage, 2)}</td>
-              <td>${formatNumber(row.estimatedFullTwoAccountCap)}</td>
-              <td>${formatPercent(row.moderationRate)}</td>
-              <td>${formatNumber(row.avgOutputsIfOnlyThisCategory)}</td>
+              <td title="${tooltip(`Merged category: ${row.category}`)}">${escapeAttribute(row.category)}</td>
+              <td title="${tooltip(`Sum of outputs in ${row.category}: ${formatNumber(row.combinedOutputs)}.`)}">${formatNumber(row.combinedOutputs)}</td>
+              <td title="${tooltip(`Sum of moderated outputs in ${row.category}: ${formatNumber(row.combinedModerated)}.`)}">${formatNumber(row.combinedModerated)}</td>
+              <td title="${tooltip(`Allocated usage for ${row.category}: ${formatPercent(row.combinedUsage)}.`)}">${formatPercent(row.combinedUsage)}</td>
+              <td title="${tooltip(`${formatPercent(row.combinedUsage)} category usage / ${formatPercent(metrics.accountUsageTotal)} tracked usage = ${formatPercent(row.shareOfTrackedUsage)}.`)}">${formatPercent(row.shareOfTrackedUsage)}</td>
+              <td title="${tooltip(`${formatNumber(row.combinedOutputs)} outputs / ${formatNumber(categoryUsagePoints, 2)} usage percentage points = ${formatNumber(row.outputsPer1PctUsage, 2)}.`)}">${formatNumber(row.outputsPer1PctUsage, 2)}</td>
+              <td title="${tooltip(`${formatNumber(row.combinedOutputs)} outputs / ${formatPercent(metrics.accountUsageTotal)} tracked usage = ${formatNumber(row.estimatedFullTwoAccountCap)}.`)}">${formatNumber(row.estimatedFullTwoAccountCap)}</td>
+              <td title="${tooltip(`${formatNumber(row.combinedModerated)} moderated / ${formatNumber(row.combinedOutputs)} outputs = ${formatPercent(row.moderationRate)}.`)}">${formatPercent(row.moderationRate)}</td>
+              <td title="${tooltip(`${formatNumber(row.combinedOutputs)} outputs / ${formatPercent(row.combinedUsage)} category usage = ${formatNumber(row.avgOutputsIfOnlyThisCategory)} if 100% usage was this category.`)}">${formatNumber(row.avgOutputsIfOnlyThisCategory)}</td>
             </tr>
-          `
+          `;
+          }
         )
         .join("")
     : `<tr><td colspan="9">Add counters with merged categories to preview estimates.</td></tr>`;
@@ -1014,6 +1047,7 @@ function renderBlockGroup(group, groupBlocks) {
   groupRow.dataset.blockGroupId = group.id;
   groupRow.innerHTML = `
     <div class="block-group-header">
+      <button class="block-group-drag-handle" type="button" aria-label="Drag ${escapeAttribute(group.name)} group" title="Drag group">::</button>
       <button class="ghost-button icon-button" type="button" data-action="toggle-block-group" aria-label="${group.collapsed ? "Expand group" : "Minimize group"}" title="${group.collapsed ? "Expand group" : "Minimize group"}">
         <span class="button-icon ${group.collapsed ? "icon-expand" : "icon-collapse"}" aria-hidden="true"></span>
       </button>
@@ -1143,7 +1177,6 @@ function renderCounter(block, group, counter) {
   counterRow.dataset.counterId = counter.id;
   counterRow.innerHTML = `
     <button class="drag-handle" type="button" aria-label="Drag ${escapeAttribute(counter.name)}" title="Drag to reorder">::</button>
-    <input class="counter-name-input" type="text" aria-label="Counter name" title="Counter name">
     <select class="counter-category-select" aria-label="${escapeAttribute(counter.name)} merged category" title="Merged category used in preview formulas">
       ${optionMarkup(mergedCategories, counter.category)}
     </select>
@@ -1170,7 +1203,6 @@ function renderCounter(block, group, counter) {
     </div>
   `;
 
-  counterRow.querySelector(".counter-name-input").value = counter.name;
   counterRow.querySelector(".counter-multiplier").value = multiplierFromInput(counter.multiplier);
   counterRow.querySelector(".counter-value").value = counter.value;
   counterRow.querySelector(".counter-moderated").value = counter.moderated;
@@ -1384,6 +1416,21 @@ els.counterList.addEventListener("click", (event) => {
 });
 
 els.counterList.addEventListener("pointerdown", (event) => {
+  const blockGroupRow = event.target.closest(".block-group-row");
+  const blockGroupHandle = event.target.closest(".block-group-drag-handle");
+  if (blockGroupRow && blockGroupHandle && event.button === 0) {
+    event.preventDefault();
+    draggedItem = {
+      type: "blockGroup",
+      blockGroupId: blockGroupRow.dataset.blockGroupId,
+    };
+    pointerDrag = { pointerId: event.pointerId };
+    blockGroupRow.classList.add("is-dragging");
+    document.body.classList.add("is-reordering");
+    event.target.setPointerCapture?.(event.pointerId);
+    return;
+  }
+
   const blockRow = event.target.closest(".block-row");
   const groupRow = event.target.closest(".sub-block");
   const counterRow = event.target.closest(".counter-row");
@@ -1422,6 +1469,9 @@ window.addEventListener("pointermove", (event) => {
 window.addEventListener("pointerup", (event) => {
   if (!pointerDrag || event.pointerId !== pointerDrag.pointerId) return;
   const target = showDragTarget(event.clientX, event.clientY);
+  if (target && draggedItem?.type === "blockGroup") {
+    moveBlockGroup(draggedItem.blockGroupId, target.targetId, target.placeAfter);
+  }
   if (target && draggedItem?.type === "group") {
     moveGroup(draggedItem.blockId, draggedItem.groupId, target.targetId, target.placeAfter);
   }
@@ -1475,13 +1525,15 @@ els.counterList.addEventListener("change", (event) => {
   const groupRow = event.target.closest(".sub-block");
   const counterRow = event.target.closest(".counter-row");
   if (event.target.classList.contains("counter-category-select") && groupRow && counterRow) {
+    const category = normalizeMergedCategory(event.target.value);
     updateCounter(
       blockRow.dataset.blockId,
       groupRow.dataset.groupId,
       counterRow.dataset.counterId,
-      { category: normalizeMergedCategory(event.target.value) },
+      { name: category, category },
       false
     );
+    refreshCounterLabels(counterRow, category);
     return;
   }
 
@@ -1595,18 +1647,6 @@ els.counterList.addEventListener("input", (event) => {
   const counterRow = event.target.closest(".counter-row");
   if (!counterRow) return;
 
-  if (event.target.classList.contains("counter-name-input")) {
-    updateCounter(
-      blockRow.dataset.blockId,
-      groupRow.dataset.groupId,
-      counterRow.dataset.counterId,
-      { name: event.target.value },
-      false
-    );
-    refreshCounterLabels(counterRow, event.target.value);
-    return;
-  }
-
   if (event.target.classList.contains("counter-multiplier")) {
     updateCounter(
       blockRow.dataset.blockId,
@@ -1690,12 +1730,6 @@ els.counterList.addEventListener("focusout", (event) => {
   if (!groupRow || !counterRow) {
     return;
   }
-  if (event.target.classList.contains("counter-name-input")) {
-    updateCounter(blockRow.dataset.blockId, groupRow.dataset.groupId, counterRow.dataset.counterId, {
-      name: event.target.value.trim() || "Untitled counter",
-    });
-    return;
-  }
 });
 
 els.counterList.addEventListener("keydown", (event) => {
@@ -1703,8 +1737,7 @@ els.counterList.addEventListener("keydown", (event) => {
     event.target.classList.contains("block-group-name-input") ||
     event.target.classList.contains("block-name-input") ||
     event.target.classList.contains("block-account-input") ||
-    event.target.classList.contains("group-name-input") ||
-    event.target.classList.contains("counter-name-input");
+    event.target.classList.contains("group-name-input");
   if (event.key === "Enter" && isEditableName) event.target.blur();
 });
 

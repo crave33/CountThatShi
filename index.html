@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>CountThatShi</title>
-    <link rel="stylesheet" href="styles.css?v=20260709-tooltips-categories">
+    <link rel="stylesheet" href="styles.css?v=20260709-preview-tooltips">
   </head>
   <body>
     <main class="app-shell">
@@ -90,15 +90,15 @@
           <table class="preview-table">
             <thead>
               <tr>
-                <th>Category</th>
-                <th>Outputs</th>
-                <th>Moderated</th>
-                <th>Usage</th>
-                <th>Share</th>
-                <th>Outputs / 1%</th>
-                <th>Full cap</th>
-                <th>Mod rate</th>
-                <th>Only category</th>
+                <th title="Merged category selected on counters">Category</th>
+                <th title="Sum of outputs for this category in the selected account type">Outputs</th>
+                <th title="Sum of moderated outputs for this category">Moderated</th>
+                <th title="Allocated usage for this category from block usage start/end">Usage</th>
+                <th title="Category usage divided by total tracked usage for the selected account type">Share</th>
+                <th title="Outputs divided by usage percentage points">Outputs / 1%</th>
+                <th title="Outputs divided by total tracked usage for the selected account type">Full cap</th>
+                <th title="Moderated outputs divided by outputs">Mod rate</th>
+                <th title="Outputs divided by this category usage; projection if all usage went to this category">Only category</th>
               </tr>
             </thead>
             <tbody id="previewTableBody"></tbody>
@@ -107,6 +107,6 @@
       </form>
     </dialog>
 
-    <script src="app.js?v=20260709-tooltips-categories"></script>
+    <script src="app.js?v=20260709-preview-tooltips"></script>
   </body>
 </html>
