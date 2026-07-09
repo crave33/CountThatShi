@@ -1411,7 +1411,14 @@ els.counterList.addEventListener("click", (event) => {
     removeCounter(blockId, group.id, counter.id);
   }
   if (button.dataset.action === "clear-counter") {
-    updateCounter(blockId, group.id, counter.id, { value: 0 }, true, "decrease");
+    updateCounter(
+      blockId,
+      group.id,
+      counter.id,
+      { value: 0, moderated: 0 },
+      true,
+      "decrease"
+    );
   }
 });
 
