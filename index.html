@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CountThatShi</title>
+    <link rel="stylesheet" href="styles.css?v=20260708-1080-layout">
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="top-bar">
+        <div>
+          <h1>CountThatShi</h1>
+          <p>Track compact counter blocks.</p>
+        </div>
+        <div class="top-actions">
+          <button class="ghost-button" id="themeToggleButton" type="button">Dark mode</button>
+          <button class="ghost-button" id="newGroupButton" type="button">New group</button>
+          <button class="primary-button" id="newCounterButton" type="button">New block</button>
+        </div>
+      </header>
+
+      <section class="view-toolbar" aria-label="Block sorting and filtering">
+        <select id="filterSelect" aria-label="Filter blocks">
+          <option value="all">All blocks</option>
+          <option value="dated">With date</option>
+          <option value="undated">No date</option>
+          <option value="timed">With time range</option>
+          <option value="today">Today</option>
+        </select>
+        <select id="sortSelect" aria-label="Sort blocks">
+          <option value="manual">Newest first</option>
+          <option value="name">Name A-Z</option>
+          <option value="date">Date earliest</option>
+          <option value="startTime">Start time earliest</option>
+        </select>
+      </section>
+
+      <section class="counter-list" id="counterList" aria-live="polite"></section>
+
+      <p class="empty-state" id="emptyState">
+        No blocks yet. Create one to start tracking.
+      </p>
+    </main>
+
+    <dialog class="counter-dialog" id="counterDialog">
+      <form method="dialog" class="dialog-card" id="counterForm">
+        <label for="counterName">Block name</label>
+        <input id="counterName" name="counterName" type="text" autocomplete="off" required>
+        <label for="counterGroup">Group</label>
+        <select id="counterGroup" name="counterGroup"></select>
+
+        <div class="dialog-actions">
+          <button class="ghost-button" value="cancel" type="button" id="cancelDialogButton">Cancel</button>
+          <button class="primary-button" value="default" type="submit">Create block</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="copy-dialog" id="copyDialog">
+      <form method="dialog" class="copy-card">
+        <textarea id="copyDetailsText" readonly aria-label="Block details"></textarea>
+        <div class="dialog-actions">
+          <button class="primary-button" value="default" type="submit">Close</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="copy-dialog" id="importDialog">
+      <form class="copy-card" id="importForm">
+        <textarea id="importDetailsText" aria-label="Import block details" placeholder="Paste copied block details here"></textarea>
+        <p class="dialog-error" id="importError" role="alert"></p>
+        <div class="dialog-actions">
+          <button class="ghost-button" value="cancel" type="button" id="cancelImportButton">Cancel</button>
+          <button class="primary-button" type="submit">Import</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="app.js?v=20260708-1080-layout"></script>
+  </body>
+</html>
