@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>CountThatShi</title>
-    <link rel="stylesheet" href="styles.css?v=20260708-1080-layout">
+    <link rel="stylesheet" href="styles.css?v=20260709-tooltips-categories">
   </head>
   <body>
     <main class="app-shell">
@@ -14,21 +14,22 @@
           <p>Track compact counter blocks.</p>
         </div>
         <div class="top-actions">
-          <button class="ghost-button" id="themeToggleButton" type="button">Dark mode</button>
-          <button class="ghost-button" id="newGroupButton" type="button">New group</button>
-          <button class="primary-button" id="newCounterButton" type="button">New block</button>
+          <button class="ghost-button" id="themeToggleButton" type="button" title="Toggle light or dark theme">Dark mode</button>
+          <button class="ghost-button" id="previewButton" type="button" title="Open formula preview">Preview</button>
+          <button class="ghost-button" id="newGroupButton" type="button" title="Create a new block group">New group</button>
+          <button class="primary-button" id="newCounterButton" type="button" title="Create a new block">New block</button>
         </div>
       </header>
 
       <section class="view-toolbar" aria-label="Block sorting and filtering">
-        <select id="filterSelect" aria-label="Filter blocks">
+        <select id="filterSelect" aria-label="Filter blocks" title="Filter visible blocks">
           <option value="all">All blocks</option>
           <option value="dated">With date</option>
           <option value="undated">No date</option>
           <option value="timed">With time range</option>
           <option value="today">Today</option>
         </select>
-        <select id="sortSelect" aria-label="Sort blocks">
+        <select id="sortSelect" aria-label="Sort blocks" title="Sort visible blocks">
           <option value="manual">Newest first</option>
           <option value="name">Name A-Z</option>
           <option value="date">Date earliest</option>
@@ -46,37 +47,66 @@
     <dialog class="counter-dialog" id="counterDialog">
       <form method="dialog" class="dialog-card" id="counterForm">
         <label for="counterName">Block name</label>
-        <input id="counterName" name="counterName" type="text" autocomplete="off" required>
+        <input id="counterName" name="counterName" type="text" autocomplete="off" required title="New block name">
         <label for="counterGroup">Group</label>
-        <select id="counterGroup" name="counterGroup"></select>
+        <select id="counterGroup" name="counterGroup" title="Group for the new block"></select>
 
         <div class="dialog-actions">
-          <button class="ghost-button" value="cancel" type="button" id="cancelDialogButton">Cancel</button>
-          <button class="primary-button" value="default" type="submit">Create block</button>
+          <button class="ghost-button" value="cancel" type="button" id="cancelDialogButton" title="Cancel block creation">Cancel</button>
+          <button class="primary-button" value="default" type="submit" title="Create this block">Create block</button>
         </div>
       </form>
     </dialog>
 
     <dialog class="copy-dialog" id="copyDialog">
       <form method="dialog" class="copy-card">
-        <textarea id="copyDetailsText" readonly aria-label="Block details"></textarea>
+        <textarea id="copyDetailsText" readonly aria-label="Block details" title="Exported block details"></textarea>
         <div class="dialog-actions">
-          <button class="primary-button" value="default" type="submit">Close</button>
+          <button class="primary-button" value="default" type="submit" title="Close dialog">Close</button>
         </div>
       </form>
     </dialog>
 
     <dialog class="copy-dialog" id="importDialog">
       <form class="copy-card" id="importForm">
-        <textarea id="importDetailsText" aria-label="Import block details" placeholder="Paste copied block details here"></textarea>
+        <textarea id="importDetailsText" aria-label="Import block details" placeholder="Paste copied block details here" title="Paste exported block details"></textarea>
         <p class="dialog-error" id="importError" role="alert"></p>
         <div class="dialog-actions">
-          <button class="ghost-button" value="cancel" type="button" id="cancelImportButton">Cancel</button>
-          <button class="primary-button" type="submit">Import</button>
+          <button class="ghost-button" value="cancel" type="button" id="cancelImportButton" title="Cancel import">Cancel</button>
+          <button class="primary-button" type="submit" title="Import pasted block details">Import</button>
         </div>
       </form>
     </dialog>
 
-    <script src="app.js?v=20260708-1080-layout"></script>
+    <dialog class="preview-dialog" id="previewDialog">
+      <form method="dialog" class="preview-card">
+        <div class="preview-header">
+          <h2>Sheet preview</h2>
+          <select id="previewAccountSelect" aria-label="Preview account type" title="Choose which account type to preview"></select>
+          <button class="ghost-button" value="default" type="submit" title="Close preview">Close</button>
+        </div>
+        <div class="preview-summary" id="previewSummary"></div>
+        <div class="preview-table-wrap">
+          <table class="preview-table">
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th>Outputs</th>
+                <th>Moderated</th>
+                <th>Usage</th>
+                <th>Share</th>
+                <th>Outputs / 1%</th>
+                <th>Full cap</th>
+                <th>Mod rate</th>
+                <th>Only category</th>
+              </tr>
+            </thead>
+            <tbody id="previewTableBody"></tbody>
+          </table>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="app.js?v=20260709-tooltips-categories"></script>
   </body>
 </html>

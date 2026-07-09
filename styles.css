@@ -254,8 +254,10 @@ button:disabled {
 
 .block-header {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) minmax(120px, 170px) minmax(150px, 180px) minmax(190px, 240px) auto;
-  grid-template-areas: "block-name block-group block-date block-time block-actions";
+  grid-template-columns: minmax(180px, 1fr) minmax(120px, 150px) minmax(140px, 180px) minmax(150px, 190px);
+  grid-template-areas:
+    "block-name block-account block-group block-date"
+    "block-time block-usage block-actions block-actions";
   align-items: center;
   gap: 8px;
   padding-bottom: 8px;
@@ -270,6 +272,10 @@ button:disabled {
   grid-area: block-group;
 }
 
+.block-account-input {
+  grid-area: block-account;
+}
+
 .block-date-input {
   grid-area: block-date;
 }
@@ -278,8 +284,19 @@ button:disabled {
   grid-area: block-time;
 }
 
+.block-usage-range {
+  grid-area: block-usage;
+}
+
 .block-actions {
   grid-area: block-actions;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+}
+
+.block-actions button {
+  white-space: nowrap;
 }
 
 .block-row.is-collapsed {
@@ -345,7 +362,7 @@ button:disabled {
 
 .counter-row {
   display: grid;
-  grid-template-columns: 34px minmax(150px, 1fr) minmax(170px, 0.8fr) auto;
+  grid-template-columns: 34px minmax(140px, 1fr) minmax(140px, 1fr) minmax(170px, 0.8fr) 82px 52px auto;
   align-items: center;
   gap: 8px;
   border-radius: 8px;
@@ -383,14 +400,19 @@ button:disabled {
 .block-name-input,
 .block-group-name-input,
 .block-group-select,
+.block-account-input,
 .block-date-input,
 .block-time-input,
+.block-usage-input,
 .group-name-input,
 .counter-name-input,
+.counter-category-select,
 .counter-multiplier,
 .counter-value,
+.counter-moderated,
 #counterName,
-#counterGroup {
+#counterGroup,
+#previewAccountSelect {
   width: 100%;
   min-height: 34px;
   border: 1px solid var(--line);
@@ -413,7 +435,17 @@ button:disabled {
   color: var(--muted);
 }
 
+.block-account-input {
+  color: var(--muted);
+}
+
 .block-time-range {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.block-usage-range {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
@@ -423,9 +455,17 @@ button:disabled {
   color: var(--muted);
 }
 
+.block-usage-input {
+  color: var(--muted);
+}
+
 .counter-name-input {
   min-width: 0;
   font-weight: 700;
+}
+
+.counter-category-select {
+  min-width: 0;
 }
 
 .counter-main {
@@ -484,6 +524,23 @@ button:disabled {
   text-align: center;
 }
 
+.counter-moderated {
+  text-align: center;
+}
+
+.counter-include {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--muted);
+  font-weight: 700;
+}
+
 .counter-value.is-increase {
   border-color: var(--accent);
 }
@@ -529,8 +586,9 @@ button:disabled {
   .block-header {
     grid-template-columns: minmax(220px, 1fr) minmax(150px, 190px) minmax(170px, 220px);
     grid-template-areas:
-      "block-name block-group block-date"
-      "block-time block-actions block-actions";
+      "block-name block-account block-group"
+      "block-date block-time block-usage"
+      "block-actions block-actions block-actions";
   }
 
   .block-actions {
@@ -568,7 +626,8 @@ button:disabled {
 }
 
 .counter-dialog,
-.copy-dialog {
+.copy-dialog,
+.preview-dialog {
   width: min(420px, calc(100% - 32px));
   border: 0;
   border-radius: 8px;
@@ -577,15 +636,92 @@ button:disabled {
 }
 
 .counter-dialog::backdrop,
-.copy-dialog::backdrop {
+.copy-dialog::backdrop,
+.preview-dialog::backdrop {
   background: rgba(31, 41, 51, 0.42);
 }
 
 .dialog-card,
-.copy-card {
+.copy-card,
+.preview-card {
   display: grid;
   gap: 8px;
   padding: 16px;
+}
+
+.preview-dialog {
+  width: min(1120px, calc(100% - 32px));
+}
+
+.preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+#previewAccountSelect {
+  width: min(220px, 100%);
+}
+
+.preview-header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.preview-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.preview-summary div {
+  display: grid;
+  gap: 2px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+}
+
+.preview-summary strong {
+  font-size: 1.1rem;
+}
+
+.preview-summary span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.preview-table-wrap {
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.preview-table {
+  width: 100%;
+  min-width: 920px;
+  border-collapse: collapse;
+}
+
+.preview-table th,
+.preview-table td {
+  padding: 8px;
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.preview-table th:first-child,
+.preview-table td:first-child {
+  text-align: left;
+}
+
+.preview-table th {
+  background: var(--panel-strong);
+  color: var(--muted);
+  font-size: 0.82rem;
 }
 
 #copyDetailsText {
@@ -660,14 +796,20 @@ button:disabled {
   .block-header {
     grid-template-areas:
       "block-name"
+      "block-account"
       "block-group"
       "block-date"
       "block-time"
+      "block-usage"
       "block-actions";
   }
 
   .counter-main,
   .counter-controls {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .preview-summary {
     grid-template-columns: 1fr 1fr;
   }
 

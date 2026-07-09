@@ -3,10 +3,31 @@ const blockGroupStorageKey = "count-that-shi-block-groups";
 const themeStorageKey = "count-that-shi-theme";
 const viewStorageKey = "count-that-shi-view";
 const defaultBlockGroupId = "default";
+const defaultAccountType = "Weekly";
+const mergedCategories = [
+  "Images Quality mode",
+  "Images Speed mode",
+  "Image edits",
+  "720p 6s",
+  "720p 10s",
+  "720p 15s",
+  "720p extend 6s",
+  "720p extend 10s",
+  "480p 6s",
+  "480p 10s",
+  "480p 15s",
+  "480p extend 6s",
+  "480p extend 10s",
+];
+const mergedCategoryAliases = {
+  "Extend 720p +10s": "720p extend 10s",
+  "Extend 720p 10s": "720p extend 10s",
+};
 
 const els = {
   newCounterButton: document.querySelector("#newCounterButton"),
   newGroupButton: document.querySelector("#newGroupButton"),
+  previewButton: document.querySelector("#previewButton"),
   themeToggleButton: document.querySelector("#themeToggleButton"),
   filterSelect: document.querySelector("#filterSelect"),
   sortSelect: document.querySelector("#sortSelect"),
@@ -22,6 +43,10 @@ const els = {
   importDetailsText: document.querySelector("#importDetailsText"),
   importError: document.querySelector("#importError"),
   cancelImportButton: document.querySelector("#cancelImportButton"),
+  previewDialog: document.querySelector("#previewDialog"),
+  previewAccountSelect: document.querySelector("#previewAccountSelect"),
+  previewSummary: document.querySelector("#previewSummary"),
+  previewTableBody: document.querySelector("#previewTableBody"),
   counterList: document.querySelector("#counterList"),
   emptyState: document.querySelector("#emptyState"),
 };
@@ -36,6 +61,7 @@ let pointerDrag = null;
 let importTargetBlockId = null;
 
 syncBlockGroups();
+saveBlocks();
 
 function loadBlocks() {
   try {
@@ -62,10 +88,15 @@ function normalizeBlock(item) {
   return {
     id: item.id || crypto.randomUUID(),
     name: item.name || "Untitled block",
+    accountType: normalizeAccountType(
+      item.accountType || item.accountSystem || inferAccountType(item.name)
+    ),
     blockGroupId: item.blockGroupId || defaultBlockGroupId,
     date: item.date || "",
     startTime: item.startTime || "",
     endTime: item.endTime || "",
+    usageStart: percentFromInput(item.usageStart),
+    usageEnd: percentFromInput(item.usageEnd),
     collapsed: Boolean(item.collapsed),
     groups: groups.length ? groups : [createGroupData("Sub-block 1")],
   };
@@ -102,10 +133,15 @@ function normalizeGroup(group) {
 }
 
 function normalizeCounter(counter) {
+  const name = counter.name || "Untitled counter";
+  const category = counter.category || counter.mergedCategory || name;
   return {
     id: counter.id || crypto.randomUUID(),
-    name: counter.name || "Untitled counter",
+    name,
+    category: normalizeMergedCategory(category),
     value: numberFromInput(counter.value),
+    moderated: Math.max(0, numberFromInput(counter.moderated)),
+    includeInComparison: counter.includeInComparison !== false,
     multiplier: multiplierFromInput(counter.multiplier),
   };
 }
@@ -142,7 +178,10 @@ function createCounterData(name) {
   return {
     id: crypto.randomUUID(),
     name,
+    category: normalizeMergedCategory(name),
     value: 0,
+    moderated: 0,
+    includeInComparison: true,
     multiplier: 1,
   };
 }
@@ -153,6 +192,40 @@ function saveBlocks() {
 
 function saveBlockGroups() {
   localStorage.setItem(blockGroupStorageKey, JSON.stringify(blockGroups));
+}
+
+function inferAccountType(value) {
+  const text = String(value || "");
+  if (/account\s*2|acct\s*2/i.test(text)) return "Account2";
+  if (/weekly|week/i.test(text)) return "Weekly";
+  if (/daily|day/i.test(text)) return "Daily";
+  return defaultAccountType;
+}
+
+function normalizeAccountType(value) {
+  const trimmed = String(value || "").trim();
+  return trimmed || defaultAccountType;
+}
+
+function getAccountTypes() {
+  const accountTypes = blocks.map((block) => normalizeAccountType(block.accountType));
+  return Array.from(new Set([defaultAccountType, ...accountTypes])).sort((left, right) =>
+    left.localeCompare(right)
+  );
+}
+
+function normalizeMergedCategory(value) {
+  const normalized = mergedCategoryAliases[value] || value;
+  return mergedCategories.includes(normalized) ? normalized : mergedCategories[0];
+}
+
+function optionMarkup(options, selectedValue) {
+  return options
+    .map(
+      (option) =>
+        `<option value="${escapeAttribute(option)}" ${option === selectedValue ? "selected" : ""}>${escapeAttribute(option)}</option>`
+    )
+    .join("");
 }
 
 function syncBlockGroups() {
@@ -189,10 +262,13 @@ function createBlock(name, blockGroupId = blockGroups[0]?.id || defaultBlockGrou
   blocks.unshift({
     id: crypto.randomUUID(),
     name,
+    accountType: defaultAccountType,
     blockGroupId: targetGroupId,
     date: "",
     startTime: "",
     endTime: "",
+    usageStart: "",
+    usageEnd: "",
     collapsed: false,
     groups: [createGroupData("Sub-block 1")],
   });
@@ -512,9 +588,170 @@ function numberFromInput(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function decimalFromInput(value) {
+  if (value === "" || value === null || value === undefined) return "";
+  const parsed = Number.parseFloat(String(value).replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : "";
+}
+
+function percentFromInput(value) {
+  const parsed = decimalFromInput(value);
+  if (parsed === "") return "";
+  return Math.max(0, Math.min(100, parsed));
+}
+
 function multiplierFromInput(value) {
   const parsed = numberFromInput(value);
   return parsed > 0 ? parsed : 1;
+}
+
+function safeDivide(numerator, denominator) {
+  return denominator ? numerator / denominator : 0;
+}
+
+function formatNumber(value, maximumFractionDigits = 0) {
+  return value.toLocaleString(undefined, { maximumFractionDigits });
+}
+
+function formatPercent(value) {
+  return `${formatNumber(value * 100, 2)}%`;
+}
+
+function getAccountType(block) {
+  return normalizeAccountType(block.accountType);
+}
+
+function getBlockUsageDelta(block) {
+  if (block.usageStart === "" || block.usageEnd === "") return 0;
+  return Math.max(0, (block.usageEnd - block.usageStart) / 100);
+}
+
+function getBlockOutputTotal(block) {
+  return block.groups.reduce(
+    (blockTotal, group) =>
+      blockTotal +
+      group.counters.reduce((groupTotal, counter) => groupTotal + counter.value, 0),
+    0
+  );
+}
+
+function getRawPreviewRows() {
+  return blocks.flatMap((block) => {
+    const accountType = getAccountType(block);
+    const usageDelta = getBlockUsageDelta(block);
+    const blockTotalOutputs = getBlockOutputTotal(block);
+
+    return block.groups.flatMap((group) =>
+      group.counters.map((counter) => {
+        const allocatedUsage = safeDivide(usageDelta * counter.value, blockTotalOutputs);
+
+        return {
+          blockId: block.id,
+          blockName: block.name,
+          accountType,
+          date: block.date,
+          startTime: block.startTime,
+          endTime: block.endTime,
+          originalCategory: counter.name,
+          mergedCategory: counter.category || counter.name,
+          totalOutputs: counter.value,
+          moderatedOutputs: counter.moderated,
+          includeInComparison: counter.includeInComparison,
+          allocatedUsage,
+        };
+      })
+    );
+  });
+}
+
+function getPreviewMetrics(accountType = defaultAccountType) {
+  const rows = getRawPreviewRows();
+  const accountRows = rows.filter((row) => row.accountType === accountType);
+  const includedRows = accountRows.filter((row) => row.includeInComparison);
+  const accountUsageTotal = accountRows.reduce((sum, row) => sum + row.allocatedUsage, 0);
+  const categories = new Map();
+
+  accountRows.forEach((row) => {
+    const key = row.mergedCategory || "Uncategorized";
+    const current =
+      categories.get(key) ||
+      {
+        category: key,
+        combinedOutputs: 0,
+        combinedModerated: 0,
+        combinedUsage: 0,
+      };
+    current.combinedOutputs += row.totalOutputs;
+    current.combinedModerated += row.moderatedOutputs;
+    current.combinedUsage += row.allocatedUsage;
+    categories.set(key, current);
+  });
+
+  const categoryRows = Array.from(categories.values())
+    .map((row) => ({
+      ...row,
+      shareOfTrackedUsage: safeDivide(row.combinedUsage, accountUsageTotal),
+      outputsPer1PctUsage: safeDivide(row.combinedOutputs, row.combinedUsage * 100),
+      estimatedFullTwoAccountCap: safeDivide(row.combinedOutputs, accountUsageTotal),
+      moderationRate: safeDivide(row.combinedModerated, row.combinedOutputs),
+      avgOutputsIfOnlyThisCategory: safeDivide(row.combinedOutputs, row.combinedUsage),
+    }))
+    .sort((left, right) => right.combinedOutputs - left.combinedOutputs);
+
+  return {
+    rows,
+    accountType,
+    accountRows,
+    categoryRows,
+    accountOutputs: includedRows.reduce(
+      (sum, row) => sum + row.totalOutputs,
+      0
+    ),
+    accountModerated: includedRows.reduce(
+      (sum, row) => sum + row.moderatedOutputs,
+      0
+    ),
+    accountUsageTotal,
+  };
+}
+
+function renderPreview() {
+  const accountTypes = getAccountTypes();
+  const selectedAccount = accountTypes.includes(els.previewAccountSelect.value)
+    ? els.previewAccountSelect.value
+    : defaultAccountType;
+  els.previewAccountSelect.innerHTML = optionMarkup(accountTypes, selectedAccount);
+  els.previewAccountSelect.value = selectedAccount;
+
+  const metrics = getPreviewMetrics(selectedAccount);
+  const projectedFullCap = safeDivide(metrics.accountOutputs, metrics.accountUsageTotal);
+
+  els.previewSummary.innerHTML = `
+    <div><strong>${escapeAttribute(metrics.accountType)}</strong><span>Account type</span></div>
+    <div><strong>${formatNumber(metrics.accountOutputs)}</strong><span>Included outputs</span></div>
+    <div><strong>${formatNumber(projectedFullCap)}</strong><span>Projected full cap</span></div>
+    <div><strong>${formatPercent(metrics.accountUsageTotal)}</strong><span>Tracked usage</span></div>
+  `;
+
+  els.previewTableBody.innerHTML = metrics.categoryRows.length
+    ? metrics.categoryRows
+        .map(
+          (row) => `
+            <tr>
+              <td>${escapeAttribute(row.category)}</td>
+              <td>${formatNumber(row.combinedOutputs)}</td>
+              <td>${formatNumber(row.combinedModerated)}</td>
+              <td>${formatPercent(row.combinedUsage)}</td>
+              <td>${formatPercent(row.shareOfTrackedUsage)}</td>
+              <td>${formatNumber(row.outputsPer1PctUsage, 2)}</td>
+              <td>${formatNumber(row.estimatedFullTwoAccountCap)}</td>
+              <td>${formatPercent(row.moderationRate)}</td>
+              <td>${formatNumber(row.avgOutputsIfOnlyThisCategory)}</td>
+            </tr>
+          `
+        )
+        .join("")
+    : `<tr><td colspan="9">Add counters with merged categories to preview estimates.</td></tr>`;
 }
 
 function applyTheme() {
@@ -575,8 +812,10 @@ function compareOptionalValues(left, right) {
 function formatBlockDetails(block) {
   const lines = [
     block.name || "Untitled block",
+    `Account: ${block.accountType}`,
     `Date: ${block.date || "Not set"}`,
     `Time: ${formatTimeRange(block)}`,
+    `Usage: ${block.usageStart === "" ? "Not set" : `${block.usageStart}%`} - ${block.usageEnd === "" ? "Not set" : `${block.usageEnd}%`}`,
     "",
     "Sub-blocks:",
   ];
@@ -585,7 +824,7 @@ function formatBlockDetails(block) {
     lines.push(`  ${indexToLetters(groupIndex)}. ${group.name || "Untitled sub-block"}`);
     group.counters.forEach((counter, counterIndex) => {
       lines.push(
-        `     ${counterIndex + 1}. ${counter.name || "Untitled counter"}: ${counter.value}`
+        `     ${counterIndex + 1}. ${counter.name || "Untitled counter"}: ${counter.value} | Category: ${counter.category || counter.name || "Uncategorized"} | Moderated: ${counter.moderated} | Include: ${counter.includeInComparison ? "Y" : "N"}`
       );
     });
   });
@@ -631,16 +870,26 @@ function parseBlockDetails(text) {
 
   const groups = [];
   let currentGroup = null;
+  const accountLine = lines.find((line) => line.startsWith("Account:"));
+  const accountType = accountLine
+    ? normalizeAccountType(accountLine.replace("Account:", "").trim())
+    : inferAccountType(lines[0]);
+  const usageLine = lines.find((line) => line.startsWith("Usage:"));
+  const usageMatch = usageLine?.match(/Usage:\s*([^-\s]+|Not set)\s*-\s*([^-\s]+|Not set)/i);
 
   lines.slice(subBlockIndex + 1).forEach((line) => {
     const groupMatch = line.match(/^\s*[A-Z]+[.)-]\s+(.+)$/i);
-    const counterMatch = line.match(/^\s+\d+\.\s+(.+):\s*(-?\d+)\s*$/);
+    const counterMatch = line.match(/^\s+\d+\.\s+(.+?):\s*(-?\d+)(?:\s*\|\s*Category:\s*(.+?))?(?:\s*\|\s*Moderated:\s*(-?\d+))?(?:\s*\|\s*Include:\s*([YN]))?\s*$/i);
 
     if (counterMatch && currentGroup) {
+      const name = counterMatch[1].trim() || "Untitled counter";
       currentGroup.counters.push({
         id: crypto.randomUUID(),
-        name: counterMatch[1].trim() || "Untitled counter",
+        name,
+        category: normalizeMergedCategory(counterMatch[3]?.trim() || name),
         value: numberFromInput(counterMatch[2]),
+        moderated: Math.max(0, numberFromInput(counterMatch[4])),
+        includeInComparison: (counterMatch[5] || "Y").toUpperCase() === "Y",
         multiplier: 1,
       });
       return;
@@ -667,6 +916,15 @@ function parseBlockDetails(text) {
   });
 
   return {
+    accountType,
+    usageStart:
+      usageMatch && usageMatch[1] !== "Not set"
+        ? percentFromInput(usageMatch[1].replace("%", ""))
+        : "",
+    usageEnd:
+      usageMatch && usageMatch[2] !== "Not set"
+        ? percentFromInput(usageMatch[2].replace("%", ""))
+        : "",
     groups,
   };
 }
@@ -761,7 +1019,7 @@ function renderBlockGroup(group, groupBlocks) {
       </button>
       <input class="block-group-name-input" type="text" aria-label="Group name">
       <span class="block-group-count">${groupBlocks.length} ${groupBlocks.length === 1 ? "block" : "blocks"}</span>
-      <button class="ghost-button" type="button" data-action="add-block-to-group">Add block</button>
+      <button class="ghost-button" type="button" data-action="add-block-to-group" title="Add a block to this group">Add block</button>
       <button class="subtle-remove-button icon-button" type="button" data-action="remove-block-group" aria-label="Remove group" title="Remove group" ${blockGroups.length === 1 ? "disabled" : ""}>
         <span class="button-icon icon-delete" aria-hidden="true"></span>
       </button>
@@ -794,20 +1052,25 @@ function renderBlock(block) {
   blockRow.dataset.blockId = block.id;
   blockRow.innerHTML = `
       <div class="block-header">
-        <input class="block-name-input" type="text" aria-label="Block name">
-        <select class="block-group-select" aria-label="Block group"></select>
-        <input class="block-date-input" type="date" aria-label="Block date">
+        <input class="block-name-input" type="text" aria-label="Block name" title="Block name">
+        <input class="block-account-input" type="text" aria-label="Account type" title="Account type used by the preview selector" placeholder="Weekly">
+        <select class="block-group-select" aria-label="Block group" title="Block group"></select>
+        <input class="block-date-input" type="date" aria-label="Block date" title="Block date">
         <div class="block-time-range">
-          <input class="block-time-input" type="time" step="60" aria-label="From time">
-          <input class="block-time-input" type="time" step="60" aria-label="To time">
+          <input class="block-time-input" type="time" step="60" aria-label="From time" title="Start time">
+          <input class="block-time-input" type="time" step="60" aria-label="To time" title="End time">
+        </div>
+        <div class="block-usage-range">
+          <input class="block-usage-input" type="number" min="0" max="100" step="0.01" inputmode="decimal" placeholder="Use start %" aria-label="Usage start percent" title="Usage percent at block start">
+          <input class="block-usage-input" type="number" min="0" max="100" step="0.01" inputmode="decimal" placeholder="Use end %" aria-label="Usage end percent" title="Usage percent at block end">
         </div>
         <div class="block-actions">
           <button class="ghost-button icon-button" type="button" data-action="toggle-block" aria-label="${block.collapsed ? "Expand block" : "Minimize block"}" title="${block.collapsed ? "Expand block" : "Minimize block"}">
             <span class="button-icon ${block.collapsed ? "icon-expand" : "icon-collapse"}" aria-hidden="true"></span>
           </button>
-          <button class="ghost-button" type="button" data-action="add-group">Add sub-block</button>
-          <button class="ghost-button copy-button" type="button" data-action="copy-details">Export</button>
-          <button class="ghost-button" type="button" data-action="import-details">Import</button>
+          <button class="ghost-button" type="button" data-action="add-group" title="Add a sub-block">Add sub-block</button>
+          <button class="ghost-button copy-button" type="button" data-action="copy-details" title="Export this block">Export</button>
+          <button class="ghost-button" type="button" data-action="import-details" title="Import into this block">Import</button>
           <button class="remove-button icon-button" type="button" data-action="remove-block" aria-label="Remove block" title="Remove block">
             <span class="button-icon icon-delete" aria-hidden="true"></span>
           </button>
@@ -817,6 +1080,7 @@ function renderBlock(block) {
     `;
 
   blockRow.querySelector(".block-name-input").value = block.name;
+  blockRow.querySelector(".block-account-input").value = block.accountType;
   const groupSelect = blockRow.querySelector(".block-group-select");
   groupSelect.innerHTML = blockGroups
     .map(
@@ -829,6 +1093,9 @@ function renderBlock(block) {
   const timeInputs = blockRow.querySelectorAll(".block-time-input");
   timeInputs[0].value = block.startTime;
   timeInputs[1].value = block.endTime;
+  const usageInputs = blockRow.querySelectorAll(".block-usage-input");
+  usageInputs[0].value = block.usageStart;
+  usageInputs[1].value = block.usageEnd;
 
   const groupList = blockRow.querySelector(".block-counter-list");
   if (!block.collapsed) {
@@ -849,7 +1116,7 @@ function renderGroup(block, group) {
       <button class="group-drag-handle" type="button" aria-label="Drag ${escapeAttribute(group.name)}" title="Drag sub-block">::</button>
       <input class="group-name-input" type="text" aria-label="Sub-block name">
       <div class="group-actions">
-        <button class="ghost-button" type="button" data-action="add-counter">Add counter</button>
+        <button class="ghost-button" type="button" data-action="add-counter" title="Add a counter to this sub-block">Add counter</button>
         <button class="subtle-remove-button icon-button" type="button" data-action="remove-group" aria-label="Remove sub-block" title="Remove sub-block">
           <span class="button-icon icon-delete" aria-hidden="true"></span>
         </button>
@@ -876,15 +1143,23 @@ function renderCounter(block, group, counter) {
   counterRow.dataset.counterId = counter.id;
   counterRow.innerHTML = `
     <button class="drag-handle" type="button" aria-label="Drag ${escapeAttribute(counter.name)}" title="Drag to reorder">::</button>
-    <input class="counter-name-input" type="text" aria-label="Counter name">
+    <input class="counter-name-input" type="text" aria-label="Counter name" title="Counter name">
+    <select class="counter-category-select" aria-label="${escapeAttribute(counter.name)} merged category" title="Merged category used in preview formulas">
+      ${optionMarkup(mergedCategories, counter.category)}
+    </select>
     <div class="counter-main">
-      <input class="counter-multiplier" type="number" min="1" step="1" inputmode="numeric" placeholder="x" aria-label="${escapeAttribute(counter.name)} multiplier">
+      <input class="counter-multiplier" type="number" min="1" step="1" inputmode="numeric" placeholder="x" aria-label="${escapeAttribute(counter.name)} multiplier" title="Amount added or removed by the +/- buttons">
       <div class="counter-controls">
-        <button class="counter-button" type="button" data-action="decrement" aria-label="Decrease ${escapeAttribute(counter.name)}">-</button>
-        <button class="counter-button" type="button" data-action="increment" aria-label="Increase ${escapeAttribute(counter.name)}">+</button>
+        <button class="counter-button" type="button" data-action="decrement" aria-label="Decrease ${escapeAttribute(counter.name)}" title="Decrease counter">-</button>
+        <button class="counter-button" type="button" data-action="increment" aria-label="Increase ${escapeAttribute(counter.name)}" title="Increase counter">+</button>
       </div>
-      <input class="counter-value${feedbackType ? ` is-${feedbackType}` : ""}" type="number" inputmode="numeric" aria-label="${escapeAttribute(counter.name)} value">
+      <input class="counter-value${feedbackType ? ` is-${feedbackType}` : ""}" type="number" inputmode="numeric" aria-label="${escapeAttribute(counter.name)} value" title="Total outputs">
     </div>
+    <input class="counter-moderated" type="number" min="0" step="1" inputmode="numeric" placeholder="Mod" aria-label="${escapeAttribute(counter.name)} moderated outputs" title="Moderated outputs">
+    <label class="counter-include" title="Include this counter in the preview">
+      <input class="counter-include-input" type="checkbox" aria-label="${escapeAttribute(counter.name)} include in comparison" title="Include this counter in the preview">
+      <span>Y</span>
+    </label>
     <div class="counter-actions">
       <button class="ghost-button icon-button" type="button" data-action="clear-counter" aria-label="Clear counter" title="Clear counter">
         <span class="button-icon icon-refresh" aria-hidden="true"></span>
@@ -898,6 +1173,8 @@ function renderCounter(block, group, counter) {
   counterRow.querySelector(".counter-name-input").value = counter.name;
   counterRow.querySelector(".counter-multiplier").value = multiplierFromInput(counter.multiplier);
   counterRow.querySelector(".counter-value").value = counter.value;
+  counterRow.querySelector(".counter-moderated").value = counter.moderated;
+  counterRow.querySelector(".counter-include-input").checked = counter.includeInComparison;
   return counterRow;
 }
 
@@ -915,6 +1192,15 @@ function refreshCounterLabels(counterRow, name) {
   counterRow
     .querySelector(".counter-multiplier")
     ?.setAttribute("aria-label", `${labelName} multiplier`);
+  counterRow
+    .querySelector(".counter-category-select")
+    ?.setAttribute("aria-label", `${labelName} merged category`);
+  counterRow
+    .querySelector(".counter-moderated")
+    ?.setAttribute("aria-label", `${labelName} moderated outputs`);
+  counterRow
+    .querySelector(".counter-include-input")
+    ?.setAttribute("aria-label", `${labelName} include in comparison`);
 }
 
 function escapeAttribute(value) {
@@ -938,6 +1224,15 @@ els.newGroupButton.addEventListener("click", () => {
   const name = window.prompt("Group name");
   if (!name?.trim()) return;
   createBlockGroup(name.trim());
+});
+
+els.previewButton.addEventListener("click", () => {
+  renderPreview();
+  els.previewDialog.showModal();
+});
+
+els.previewAccountSelect.addEventListener("change", () => {
+  renderPreview();
 });
 
 els.themeToggleButton.addEventListener("click", () => {
@@ -1168,9 +1463,28 @@ els.counterList.addEventListener("change", (event) => {
     }, false);
     return;
   }
+  if (event.target.classList.contains("block-usage-input")) {
+    const usageInputs = blockRow.querySelectorAll(".block-usage-input");
+    updateBlock(blockRow.dataset.blockId, {
+      usageStart: percentFromInput(usageInputs[0].value),
+      usageEnd: percentFromInput(usageInputs[1].value),
+    }, false);
+    return;
+  }
 
   const groupRow = event.target.closest(".sub-block");
   const counterRow = event.target.closest(".counter-row");
+  if (event.target.classList.contains("counter-category-select") && groupRow && counterRow) {
+    updateCounter(
+      blockRow.dataset.blockId,
+      groupRow.dataset.groupId,
+      counterRow.dataset.counterId,
+      { category: normalizeMergedCategory(event.target.value) },
+      false
+    );
+    return;
+  }
+
   if (event.target.classList.contains("counter-value") && groupRow && counterRow) {
     updateCounter(
       blockRow.dataset.blockId,
@@ -1187,6 +1501,27 @@ els.counterList.addEventListener("change", (event) => {
       groupRow.dataset.groupId,
       counterRow.dataset.counterId,
       { multiplier: multiplierFromInput(event.target.value) }
+    );
+    return;
+  }
+
+  if (event.target.classList.contains("counter-moderated") && groupRow && counterRow) {
+    updateCounter(
+      blockRow.dataset.blockId,
+      groupRow.dataset.groupId,
+      counterRow.dataset.counterId,
+      { moderated: Math.max(0, numberFromInput(event.target.value)) }
+    );
+    return;
+  }
+
+  if (event.target.classList.contains("counter-include-input") && groupRow && counterRow) {
+    updateCounter(
+      blockRow.dataset.blockId,
+      groupRow.dataset.groupId,
+      counterRow.dataset.counterId,
+      { includeInComparison: event.target.checked },
+      false
     );
   }
 });
@@ -1210,6 +1545,15 @@ els.counterList.addEventListener("input", (event) => {
     return;
   }
 
+  if (event.target.classList.contains("block-account-input")) {
+    updateBlock(
+      blockRow.dataset.blockId,
+      { accountType: event.target.value },
+      false
+    );
+    return;
+  }
+
   if (event.target.classList.contains("block-date-input")) {
     updateBlock(blockRow.dataset.blockId, { date: event.target.value }, false);
     return;
@@ -1222,6 +1566,18 @@ els.counterList.addEventListener("input", (event) => {
       {
         startTime: timeInputs[0].value,
         endTime: timeInputs[1].value,
+      },
+      false
+    );
+    return;
+  }
+  if (event.target.classList.contains("block-usage-input")) {
+    const usageInputs = blockRow.querySelectorAll(".block-usage-input");
+    updateBlock(
+      blockRow.dataset.blockId,
+      {
+        usageStart: percentFromInput(usageInputs[0].value),
+        usageEnd: percentFromInput(usageInputs[1].value),
       },
       false
     );
@@ -1259,6 +1615,17 @@ els.counterList.addEventListener("input", (event) => {
       { multiplier: multiplierFromInput(event.target.value) },
       false
     );
+    return;
+  }
+
+  if (event.target.classList.contains("counter-moderated")) {
+    updateCounter(
+      blockRow.dataset.blockId,
+      groupRow.dataset.groupId,
+      counterRow.dataset.counterId,
+      { moderated: Math.max(0, numberFromInput(event.target.value)) },
+      false
+    );
   }
 
 });
@@ -1282,6 +1649,13 @@ els.counterList.addEventListener("focusout", (event) => {
     return;
   }
 
+  if (event.target.classList.contains("block-account-input")) {
+    updateBlock(blockRow.dataset.blockId, {
+      accountType: normalizeAccountType(event.target.value),
+    });
+    return;
+  }
+
   if (event.target.classList.contains("block-date-input")) {
     updateBlock(blockRow.dataset.blockId, { date: event.target.value });
     return;
@@ -1295,6 +1669,14 @@ els.counterList.addEventListener("focusout", (event) => {
     });
     return;
   }
+  if (event.target.classList.contains("block-usage-input")) {
+    const usageInputs = blockRow.querySelectorAll(".block-usage-input");
+    updateBlock(blockRow.dataset.blockId, {
+      usageStart: percentFromInput(usageInputs[0].value),
+      usageEnd: percentFromInput(usageInputs[1].value),
+    });
+    return;
+  }
 
   const groupRow = event.target.closest(".sub-block");
   if (event.target.classList.contains("group-name-input") && groupRow) {
@@ -1305,18 +1687,22 @@ els.counterList.addEventListener("focusout", (event) => {
   }
 
   const counterRow = event.target.closest(".counter-row");
-  if (!groupRow || !counterRow || !event.target.classList.contains("counter-name-input")) {
+  if (!groupRow || !counterRow) {
     return;
   }
-  updateCounter(blockRow.dataset.blockId, groupRow.dataset.groupId, counterRow.dataset.counterId, {
-    name: event.target.value.trim() || "Untitled counter",
-  });
+  if (event.target.classList.contains("counter-name-input")) {
+    updateCounter(blockRow.dataset.blockId, groupRow.dataset.groupId, counterRow.dataset.counterId, {
+      name: event.target.value.trim() || "Untitled counter",
+    });
+    return;
+  }
 });
 
 els.counterList.addEventListener("keydown", (event) => {
   const isEditableName =
     event.target.classList.contains("block-group-name-input") ||
     event.target.classList.contains("block-name-input") ||
+    event.target.classList.contains("block-account-input") ||
     event.target.classList.contains("group-name-input") ||
     event.target.classList.contains("counter-name-input");
   if (event.key === "Enter" && isEditableName) event.target.blur();
