@@ -8,6 +8,11 @@ const mergedCategories = [
   "Images Quality mode",
   "Images Speed mode",
   "Image edits",
+  "1080p 6s",
+  "1080p 10s",
+  "1080p 15s",
+  "1080p extend 6s",
+  "1080p extend 10s",
   "720p 6s",
   "720p 10s",
   "720p 15s",
@@ -1188,7 +1193,13 @@ function renderCounter(block, group, counter) {
       </div>
       <input class="counter-value${feedbackType ? ` is-${feedbackType}` : ""}" type="number" inputmode="numeric" aria-label="${escapeAttribute(counter.name)} value" title="Total outputs">
     </div>
-    <input class="counter-moderated" type="number" min="0" step="1" inputmode="numeric" placeholder="Mod" aria-label="${escapeAttribute(counter.name)} moderated outputs" title="Moderated outputs">
+    <div class="counter-moderated-main">
+      <div class="counter-controls counter-moderated-controls">
+        <button class="counter-button moderated-button" type="button" data-action="moderated-decrement" aria-label="Decrease ${escapeAttribute(counter.name)} moderated outputs" title="Decrease moderated outputs">-</button>
+        <button class="counter-button moderated-button" type="button" data-action="moderated-increment" aria-label="Increase ${escapeAttribute(counter.name)} moderated outputs" title="Increase moderated outputs">+</button>
+      </div>
+      <input class="counter-moderated" type="number" min="0" step="1" inputmode="numeric" placeholder="Mod" aria-label="${escapeAttribute(counter.name)} moderated outputs" title="Moderated outputs">
+    </div>
     <label class="counter-include" title="Include this counter in the preview">
       <input class="counter-include-input" type="checkbox" aria-label="${escapeAttribute(counter.name)} include in comparison" title="Include this counter in the preview">
       <span>Y</span>
@@ -1218,6 +1229,12 @@ function refreshCounterLabels(counterRow, name) {
   counterRow
     .querySelector('[data-action="increment"]')
     ?.setAttribute("aria-label", `Increase ${labelName}`);
+  counterRow
+    .querySelector('[data-action="moderated-decrement"]')
+    ?.setAttribute("aria-label", `Decrease ${labelName} moderated outputs`);
+  counterRow
+    .querySelector('[data-action="moderated-increment"]')
+    ?.setAttribute("aria-label", `Increase ${labelName} moderated outputs`);
   counterRow
     .querySelector(".counter-value")
     ?.setAttribute("aria-label", `${labelName} value`);
@@ -1402,6 +1419,28 @@ els.counterList.addEventListener("click", (event) => {
       group.id,
       counter.id,
       { value: counter.value - multiplierFromInput(counter.multiplier) },
+      true,
+      "decrease"
+    );
+  }
+  if (button.dataset.action === "moderated-increment") {
+    updateCounter(
+      blockId,
+      group.id,
+      counter.id,
+      { moderated: counter.moderated + 1 },
+      true,
+      "increase"
+    );
+  }
+  if (button.dataset.action === "moderated-decrement") {
+    updateCounter(
+      blockId,
+      group.id,
+      counter.id,
+      {
+        moderated: Math.max(0, counter.moderated - 1),
+      },
       true,
       "decrease"
     );

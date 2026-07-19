@@ -375,7 +375,7 @@ button:disabled {
 
 .counter-row {
   display: grid;
-  grid-template-columns: 34px minmax(180px, 1.25fr) minmax(170px, 0.8fr) 82px 52px auto;
+  grid-template-columns: 34px minmax(180px, 1.15fr) minmax(170px, 0.8fr) minmax(130px, 0.65fr) 52px auto;
   align-items: center;
   gap: 8px;
   border-radius: 8px;
@@ -481,6 +481,12 @@ button:disabled {
   gap: 6px;
 }
 
+.counter-moderated-main {
+  display: grid;
+  grid-template-columns: auto minmax(58px, 1fr);
+  gap: 6px;
+}
+
 .block-group-drag-handle,
 .group-drag-handle,
 .drag-handle {
@@ -522,6 +528,20 @@ button:disabled {
 
 :root[data-theme="dark"] .counter-button {
   color: #8ff3e6;
+}
+
+.moderated-button {
+  background: var(--soft-danger);
+  border-color: color-mix(in srgb, var(--danger) 42%, var(--line));
+  color: var(--danger);
+}
+
+.moderated-button:hover {
+  background: color-mix(in srgb, var(--danger) 16%, var(--panel));
+}
+
+:root[data-theme="dark"] .moderated-button {
+  color: var(--danger);
 }
 
 .counter-value {
@@ -814,6 +834,7 @@ button:disabled {
   }
 
   .counter-main,
+  .counter-moderated-main,
   .counter-controls {
     grid-template-columns: 1fr 1fr;
   }
